@@ -1,4 +1,4 @@
-module mdhesari/discordgo-bot-kit
+module gshlan/gshbot
 
 go 1.21.5
 

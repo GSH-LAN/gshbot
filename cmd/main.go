@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
+	"gshlan/gshbot/config"
+	"gshlan/gshbot/delivery/websocketserver"
+	"gshlan/gshbot/handler/interactionhandler"
+	"gshlan/gshbot/handler/messagehandler"
 	"log"
-	"mdhesari/discordgo-bot-kit/config"
-	"mdhesari/discordgo-bot-kit/delivery/websocketserver"
-	"mdhesari/discordgo-bot-kit/handler/interactionhandler"
-	"mdhesari/discordgo-bot-kit/handler/messagehandler"
 	"os"
 	"os/signal"
 	"syscall"

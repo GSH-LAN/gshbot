@@ -1,7 +1,7 @@
 package messagehandler
 
 import (
-	"mdhesari/discordgo-bot-kit/config"
+	"gshlan/gshbot/config"
 )
 
 type Handler struct {
