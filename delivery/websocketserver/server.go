@@ -4,6 +4,8 @@ import (
 	"gshlan/gshbot/config"
 
 	"github.com/bwmarrin/discordgo"
+
+	"gshlan/gshbot/extension/rss"
 )
 
 type Handler interface {
@@ -42,6 +44,9 @@ func (s Server) Serve() {
 	for _, h := range s.handlers {
 		h.Register(s.Session)
 	}
+
+	rss.LoadFeeds(&s.config.Discord)
+	rss.ConfigureRSSFeeds(s.Session)
 }
 
 func (s Server) Shutdown() {
