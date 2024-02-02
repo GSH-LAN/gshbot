@@ -4,7 +4,8 @@ import (
 	"flag"
 	"gshlan/gshbot/config"
 	"gshlan/gshbot/delivery/websocketserver"
-	"gshlan/gshbot/handler/interactionhandler"
+
+	//"gshlan/gshbot/handler/interactionhandler"
 	"gshlan/gshbot/handler/messagehandler"
 	"log"
 	"os"
@@ -27,7 +28,7 @@ func main() {
 	// add as many handlers as you want implementing websocketserver.Handler...
 	handlers := []websocketserver.Handler{
 		messagehandler.New(&cfg.Discord),
-		interactionhandler.New(&cfg.Discord),
+		//interactionhandler.New(&cfg.Discord),
 	}
 
 	server := websocketserver.New(&cfg, handlers, discordgo.IntentsAll)
