@@ -20,7 +20,7 @@ var (
 )
 
 func init() {
-	cfg = config.Load("config.yml")
+	cfg = config.Load("data/config.yml")
 	flag.Parse()
 }
 
