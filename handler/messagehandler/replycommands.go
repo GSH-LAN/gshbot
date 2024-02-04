@@ -2,6 +2,7 @@ package messagehandler
 
 import (
 	"gshlan/gshbot/extension/rss"
+	"regexp"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -15,6 +16,7 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 	}
 
 	if strings.HasPrefix(msg.Content, h.config.Prefix+"rss") && len(strings.Split(msg.Content, " ")) >= 3 {
+		var badChannelId string
 		var channelId string
 		if strings.Split(msg.Content, " ")[1] == "add" {
 			name := strings.Split(msg.Content, " ")[2]
@@ -22,7 +24,9 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 			if strings.Contains(url, "http://") || strings.Contains(url, "https://") {
 				s.ChannelMessageSend(msg.ChannelID, "try to add the following feed name: "+name+" url: "+url)
 				if len(strings.Split(msg.Content, " ")) == 5 {
-					channelId = strings.Split(msg.Content, " ")[4]
+					badChannelId = strings.Split(msg.Content, " ")[4]
+					r, _ := regexp.Compile("\\d{18}")
+					channelId = r.FindString(badChannelId)
 				} else {
 					channelId = msg.ChannelID
 				}
