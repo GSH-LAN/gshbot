@@ -77,7 +77,7 @@ func AddUrlToList(Name string, Url string, ChannelId string, cfg *config.Discord
 			Name:            Name,
 			Url:             Url,
 			ChannelId:       ChannelId,
-			Timer:           3600,
+			Timer:           300,
 			ActiveStatus:    true,
 			MentionEveryOne: false,
 		}
@@ -109,7 +109,7 @@ func AddUrlToList(Name string, Url string, ChannelId string, cfg *config.Discord
 					Name:            Name,
 					Url:             Url,
 					ChannelId:       ChannelId,
-					Timer:           3600,
+					Timer:           300,
 					ActiveStatus:    true,
 					MentionEveryOne: false,
 				}
