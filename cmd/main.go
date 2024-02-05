@@ -7,6 +7,7 @@ import (
 
 	//"gshlan/gshbot/handler/interactionhandler"
 	"gshlan/gshbot/handler/messagehandler"
+	"gshlan/gshbot/handler/moritzhandler"
 	"log"
 	"os"
 	"os/signal"
@@ -28,6 +29,7 @@ func main() {
 	// add as many handlers as you want implementing websocketserver.Handler...
 	handlers := []websocketserver.Handler{
 		messagehandler.New(&cfg.Discord),
+		moritzhandler.New(&cfg.Discord),
 		//interactionhandler.New(&cfg.Discord),
 	}
 
