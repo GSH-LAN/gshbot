@@ -36,7 +36,7 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 
 	emojis := msg.GetCustomEmojis()
 	if len(emojis) >= 1 {
-		println("found cust emoji in msg")
+		//log.println("found cust emoji in msg")
 		for _, element := range emojis {
 			//log.Println(element.APIName())
 			if element.Name == "moritz" {
