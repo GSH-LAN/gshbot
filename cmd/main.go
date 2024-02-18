@@ -6,6 +6,7 @@ import (
 	"gshlan/gshbot/delivery/websocketserver"
 
 	//"gshlan/gshbot/handler/interactionhandler"
+	"gshlan/gshbot/handler/emojihandler"
 	"gshlan/gshbot/handler/messagehandler"
 	"gshlan/gshbot/handler/moritzhandler"
 	"log"
@@ -30,6 +31,7 @@ func main() {
 	handlers := []websocketserver.Handler{
 		messagehandler.New(&cfg.Discord),
 		moritzhandler.New(&cfg.Discord),
+		emojihandler.New(&cfg.Discord),
 		//interactionhandler.New(&cfg.Discord),
 	}
 
