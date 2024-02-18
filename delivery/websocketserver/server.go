@@ -6,6 +6,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"gshlan/gshbot/extension/rss"
+	"gshlan/gshbot/extension/status"
 )
 
 type Handler interface {
@@ -47,6 +48,7 @@ func (s Server) Serve() {
 
 	rss.LoadFeeds(&s.config.Discord)
 	rss.ConfigureRSSFeeds(s.Session)
+	status.SetBotStatus(s.Session)
 }
 
 func (s Server) Shutdown() {
