@@ -33,7 +33,7 @@ require (
 )
 
 require (
-	github.com/bwmarrin/discordgo v0.27.1
+	github.com/bwmarrin/discordgo v0.28.1
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/knadh/koanf/providers/file v0.1.0
 	github.com/mitchellh/copystructure v1.2.0 // indirect
