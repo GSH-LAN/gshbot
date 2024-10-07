@@ -36,7 +36,7 @@ require (
 require (
 	github.com/bwmarrin/discordgo v0.28.1
 	github.com/knadh/koanf/maps v0.1.1 // indirect
-	github.com/knadh/koanf/providers/file v1.1.0
+	github.com/knadh/koanf/providers/file v1.1.2
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/pnkj-kmr/simple-json-db v1.0.0
