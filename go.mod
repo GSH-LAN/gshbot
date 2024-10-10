@@ -1,6 +1,7 @@
 module gshlan/gshbot
 
-go 1.21.5
+go 1.22.3
+
 toolchain go1.22.5
 
 require (
