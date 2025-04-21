@@ -6,7 +6,7 @@ toolchain go1.23.7
 
 require (
 	github.com/knadh/koanf/parsers/yaml v0.1.0
-	github.com/knadh/koanf/v2 v2.1.2
+	github.com/knadh/koanf/v2 v2.2.0
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/tidwall/gjson v1.18.0
 )
@@ -32,7 +32,7 @@ require (
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1
-	github.com/knadh/koanf/maps v0.1.1 // indirect
+	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/providers/file v1.1.2
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
