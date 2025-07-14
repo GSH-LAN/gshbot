@@ -6,7 +6,7 @@ toolchain go1.23.7
 
 require (
 	github.com/knadh/koanf/parsers/yaml v1.1.0
-	github.com/knadh/koanf/v2 v2.2.1
+	github.com/knadh/koanf/v2 v2.2.2
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/tidwall/gjson v1.18.0
 )
