@@ -43,8 +43,8 @@ github.com/modern-go/reflect2 v1.0.2 h1:xBagoLtFs94CBntxluKeaWgTMpvLxC4ur3nMaC9G
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/pnkj-kmr/simple-json-db v1.1.0 h1:9A21RlYmqfN8SpGlZ+CItzpCIiJMF15+ncf3YfpJrPY=
-github.com/pnkj-kmr/simple-json-db v1.1.0/go.mod h1:w3QxWqARlaBrEfYzeEavpeEzaowZMQVoMxmqKs/on2c=
+github.com/pnkj-kmr/simple-json-db v1.2.0 h1:h2fozDpcyFucET/gmORR0bMzsE7IYppPD8xtlhL3dsk=
+github.com/pnkj-kmr/simple-json-db v1.2.0/go.mod h1:w3QxWqARlaBrEfYzeEavpeEzaowZMQVoMxmqKs/on2c=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
