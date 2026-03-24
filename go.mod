@@ -34,5 +34,5 @@ require (
 	github.com/knadh/koanf/providers/file v1.2.0
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/pnkj-kmr/simple-json-db v1.2.0
+	github.com/pnkj-kmr/simple-json-db v1.3.0
 )
