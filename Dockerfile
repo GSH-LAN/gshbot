@@ -1,6 +1,6 @@
 # Dockerfile References: https://docs.docker.com/engine/reference/builder/
 
-# Start from FROM golang:1.25-alpine base image
+# Start from golang:1.25-alpine base image
 FROM golang:1.25-alpine
 
 # The latest alpine images don't have some tools like (`git` and `bash`).
