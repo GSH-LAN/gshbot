@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/v2 v2.3.6
-	github.com/mmcdole/gofeed v1.4.1
+	github.com/mmcdole/gofeed v1.4.2
 	github.com/tidwall/gjson v1.19.0
 )
 
