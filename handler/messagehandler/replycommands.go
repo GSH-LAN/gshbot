@@ -16,6 +16,11 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 	}
 
 	if strings.HasPrefix(msg.Content, h.config.Prefix+"rss") && len(strings.Split(msg.Content, " ")) >= 3 {
+		if !hasManageGuildPermission(s, msg) {
+			s.ChannelMessageSend(msg.ChannelID, "you need the 'Manage Server' permission to manage RSS feeds")
+			return
+		}
+
 		var badChannelId string
 		var channelId string
 		if strings.Split(msg.Content, " ")[1] == "add" {
@@ -55,4 +60,14 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 		}
 
 	}
+}
+
+// hasManageGuildPermission reports whether the message author has the
+// Discord "Manage Server" permission in the channel the command was sent in.
+func hasManageGuildPermission(s *discordgo.Session, msg *discordgo.MessageCreate) bool {
+	perms, err := s.UserChannelPermissions(msg.Author.ID, msg.ChannelID)
+	if err != nil {
+		return false
+	}
+	return perms&discordgo.PermissionManageGuild == discordgo.PermissionManageGuild
 }
