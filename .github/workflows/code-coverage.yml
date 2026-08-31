@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
   code-quality: write
+  # required so the action can look up the PR for a push-triggered run
+  pull-requests: read
 
 jobs:
   test:
@@ -26,10 +28,10 @@ jobs:
         run: go mod download
 
       - name: Install gocover-cobertura
-        run: go install github.com/boumenot/gocover-cobertura@latest
+        run: go install github.com/boumenot/gocover-cobertura@v1.5.0
 
       - name: Run tests with coverage
-        run: go test -v -coverprofile=cover.out ./...
+        run: go test -v -race -coverprofile=cover.out ./...
 
       - name: Convert coverage to Cobertura XML
         run: gocover-cobertura < cover.out > coverage.xml
