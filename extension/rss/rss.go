@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gshlan/gshbot/config"
 	"log"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -46,7 +47,25 @@ type MessageQueue struct {
 var rssFeeds RSSFeeds
 var messageQueue MessageQueue
 
+// Only allow characters that are safe to use as part of a filesystem path,
+// since Name/ChannelId end up in the on-disk record key (Name + "_" + ChannelId).
+var validFeedName = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+var validChannelId = regexp.MustCompile(`^\d{17,20}$`)
+
+func validateFeedIdentifiers(name, channelId string) error {
+	if !validFeedName.MatchString(name) {
+		return errors.New("RSS40 - invalid feed name: only letters, digits, '_' and '-' are allowed")
+	}
+	if !validChannelId.MatchString(channelId) {
+		return errors.New("RSS41 - invalid channel id")
+	}
+	return nil
+}
+
 func AddUrlToList(Name string, Url string, ChannelId string, cfg *config.Discord) (bool, error) {
+	if err := validateFeedIdentifiers(Name, ChannelId); err != nil {
+		return false, err
+	}
 
 	var dbName = cfg.DBName
 	var dbColName = cfg.DBColName
@@ -198,11 +217,14 @@ func updateRSSFeeds(feed *RSSFeed) {
 			rssFeeds.mutex.Lock()
 			rssFeeds.RSSFeeds[i].ActiveStatus = feed.ActiveStatus
 			rssFeeds.mutex.Unlock()
+			return
 		}
 	}
 
 	// Feed not found, append it to the RSSFeeds slice
+	rssFeeds.mutex.Lock()
 	rssFeeds.RSSFeeds = append(rssFeeds.RSSFeeds, *feed)
+	rssFeeds.mutex.Unlock()
 }
 
 // Configures RSS Feed parsers and starts them concurrently
@@ -318,6 +340,9 @@ func updateMessageQueue(name string, message string) {
 }
 
 func RemoveFeedFromList(Name string, ChannelId string, cfg *config.Discord) (bool, error) {
+	if err := validateFeedIdentifiers(Name, ChannelId); err != nil {
+		return false, err
+	}
 
 	var dbName = cfg.DBName
 	var dbColName = cfg.DBColName
@@ -360,11 +385,10 @@ func RemoveFeedFromList(Name string, ChannelId string, cfg *config.Discord) (boo
 					log.Println(err)
 					return false, err
 				}
-			} else {
-				log.Println("del false false")
-				return false, errors.New("RSS30 - Entry could not be removed")
+				return true, nil
 			}
 		}
+		log.Println("del false false")
+		return false, errors.New("RSS30 - Entry could not be removed")
 	}
-	return true, nil
 }

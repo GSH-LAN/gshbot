@@ -1,0 +1,9 @@
+# Local config/secrets and the RSS database must never end up in the image;
+# they are provided at runtime via a bind mount instead (see docker-compose.yml).
+data
+
+.git
+.github
+.DS_Store
+feed.xml
+*.md
