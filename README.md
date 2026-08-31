@@ -26,6 +26,9 @@ go run cmd/main.go
 
 ### Run With Docker
 
+Make sure `data/config.yml` exists on the host first (see `config-sample.yml`) -
+it is bind-mounted into the container at runtime and is never baked into the image.
+
 ```bash
 docker compose up -d
 ```

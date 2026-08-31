@@ -5,6 +5,10 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    volumes:
+      # config.yml (with the bot token) and the RSS database live on the host,
+      # never inside the image/build context.
+      - ./data:/app/data
     networks:
       - backend
 networks:
