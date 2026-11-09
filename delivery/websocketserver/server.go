@@ -56,5 +56,6 @@ func (s Server) Shutdown() {
 		h.DeRegister(s.Session)
 	}
 
+	rss.StopRSSFeeds()
 	s.Session.Close()
 }

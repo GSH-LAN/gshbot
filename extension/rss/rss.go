@@ -1,6 +1,7 @@
 package rss
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,9 +44,87 @@ type MessageQueue struct {
 	MessageQueue map[string][]string // The slice of Discord messages
 }
 
-// Initializing variables for RSS feeds and Message Queue
-var rssFeeds RSSFeeds
-var messageQueue MessageQueue
+// Initializing variables for RSS feeds, Message Queue, and background workers
+var (
+	rssFeeds      RSSFeeds
+	messageQueue  MessageQueue
+	feedWorkersMu sync.Mutex
+	feedWorkers   = make(map[string]context.CancelFunc)
+	activeSession *discordgo.Session
+)
+
+func startFeedWorker(s *discordgo.Session, feed *RSSFeed) {
+	if s == nil {
+		s = activeSession
+	}
+	if s == nil {
+		return
+	}
+
+	key := feed.Name + "_" + feed.ChannelId
+	feedWorkersMu.Lock()
+	if cancel, exists := feedWorkers[key]; exists {
+		cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	feedWorkers[key] = cancel
+	feedWorkersMu.Unlock()
+
+	localFeed := *feed
+	go parseRSSFeed(ctx, s, &localFeed)
+}
+
+func stopFeedWorker(name, channelId string) {
+	key := name + "_" + channelId
+	feedWorkersMu.Lock()
+	if cancel, exists := feedWorkers[key]; exists {
+		cancel()
+		delete(feedWorkers, key)
+	}
+	feedWorkersMu.Unlock()
+}
+
+// IsWorkerRunning reports whether a background polling goroutine is active for the feed.
+func IsWorkerRunning(name, channelId string) bool {
+	feedWorkersMu.Lock()
+	defer feedWorkersMu.Unlock()
+	_, exists := feedWorkers[name+"_"+channelId]
+	return exists
+}
+
+// StopRSSFeeds stops all active feed polling workers.
+func StopRSSFeeds() {
+	feedWorkersMu.Lock()
+	for key, cancel := range feedWorkers {
+		cancel()
+		delete(feedWorkers, key)
+	}
+	feedWorkersMu.Unlock()
+}
+
+func setFeedActiveStatusInMemory(name, channelId string, active bool) *RSSFeed {
+	rssFeeds.mutex.Lock()
+	defer rssFeeds.mutex.Unlock()
+	for i, f := range rssFeeds.RSSFeeds {
+		if f.Name == name && f.ChannelId == channelId {
+			rssFeeds.RSSFeeds[i].ActiveStatus = active
+			feedCopy := rssFeeds.RSSFeeds[i]
+			return &feedCopy
+		}
+	}
+	return nil
+}
+
+func removeFeedFromMemory(name, channelId string) {
+	rssFeeds.mutex.Lock()
+	defer rssFeeds.mutex.Unlock()
+	for i, f := range rssFeeds.RSSFeeds {
+		if f.Name == name && f.ChannelId == channelId {
+			rssFeeds.RSSFeeds = append(rssFeeds.RSSFeeds[:i], rssFeeds.RSSFeeds[i+1:]...)
+			return
+		}
+	}
+}
 
 // Only allow characters that are safe to use as part of a filesystem path,
 // since Name/ChannelId end up in the on-disk record key (Name + "_" + ChannelId).
@@ -209,26 +288,26 @@ func LoadFeeds(cfg *config.Discord) {
 }
 
 func updateRSSFeeds(feed *RSSFeed) {
+	rssFeeds.mutex.Lock()
+	defer rssFeeds.mutex.Unlock()
+
 	// Search for the feed by URL in the RSSFeeds slice
 	for i, f := range rssFeeds.RSSFeeds {
 		if f.Url == feed.Url {
 			// Update the ActiveStatus of the found feed
 			log.Println("RSS: run updateRSSFeeds for feed: ", feed)
-			rssFeeds.mutex.Lock()
 			rssFeeds.RSSFeeds[i].ActiveStatus = feed.ActiveStatus
-			rssFeeds.mutex.Unlock()
 			return
 		}
 	}
 
 	// Feed not found, append it to the RSSFeeds slice
-	rssFeeds.mutex.Lock()
 	rssFeeds.RSSFeeds = append(rssFeeds.RSSFeeds, *feed)
-	rssFeeds.mutex.Unlock()
 }
 
 // Configures RSS Feed parsers and starts them concurrently
 func ConfigureRSSFeeds(s *discordgo.Session) {
+	activeSession = s
 	// Initialize the MessageQueue map
 	messageQueue.MessageQueue = make(map[string][]string)
 
@@ -241,37 +320,50 @@ func ConfigureRSSFeeds(s *discordgo.Session) {
 
 		// Creates a copy of the feed in memory for manipulation
 		localFeed := feed
-
-		go func(feed *RSSFeed) {
-			parseRSSFeed(s, feed)
-		}(&localFeed)
+		startFeedWorker(s, &localFeed)
 	}
 }
 
 // Parses a given RSS feed and sends the latest item for comparison
-func parseRSSFeed(s *discordgo.Session, feed *RSSFeed) {
+func parseRSSFeed(ctx context.Context, s *discordgo.Session, feed *RSSFeed) {
 	log.Println("RSS: parsing feed: ", feed)
 	ticker := time.NewTicker(time.Duration(feed.Timer) * time.Second)
+	defer ticker.Stop()
 	backoff := 1
 	for {
 		select {
+		case <-ctx.Done():
+			log.Printf("RSS: stopped worker for feed %s (%s)", feed.Name, feed.ChannelId)
+			return
 		case <-ticker.C:
 			// Create new feed parser
 			feedParser := gofeed.NewParser()
 
 			// Configures a backoff should the RSS feed be unavailable
 			log.Println("RSS: parsing feed url: ", feed.Url)
-			feedItems, err := feedParser.ParseURL(feed.Url)
+			feedItems, err := feedParser.ParseURLWithContext(feed.Url, ctx)
 			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
 				log.Printf("Error parsing %s: %s", feed.Url, err)
 				log.Printf("Retrying in %d seconds...", backoff+feed.Timer)
-				time.Sleep(time.Duration(backoff) * time.Second)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Duration(backoff) * time.Second):
+				}
 				backoff *= 2
 				continue
 			}
 
 			// Reset backoff if no error
 			backoff = 1
+			if feedItems == nil || len(feedItems.Items) == 0 {
+				log.Printf("RSS: feed %s has no items", feed.Url)
+				continue
+			}
+
 			var itemLink string
 			// Format most recent item in RSS Feed
 			if strings.Contains(feedItems.Title, "News") {
@@ -385,10 +477,127 @@ func RemoveFeedFromList(Name string, ChannelId string, cfg *config.Discord) (boo
 					log.Println(err)
 					return false, err
 				}
+				stopFeedWorker(Name, ChannelId)
+				removeFeedFromMemory(Name, ChannelId)
 				return true, nil
 			}
 		}
 		log.Println("del false false")
 		return false, errors.New("RSS30 - Entry could not be removed")
 	}
+}
+
+// SetFeedActiveStatus updates the activeStatus of a feed in the database, updates the in-memory
+// feed slice, and either starts or stops the background polling worker accordingly.
+func SetFeedActiveStatus(s *discordgo.Session, Name string, ChannelId string, active bool, cfg *config.Discord) (bool, error) {
+	if err := validateFeedIdentifiers(Name, ChannelId); err != nil {
+		return false, err
+	}
+
+	var dbName = cfg.DBName
+	var dbColName = cfg.DBColName
+
+	db, err := simplejsondb.New(dbName, nil)
+	if err != nil {
+		log.Println("db error: ", err)
+		return false, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	dbCol, err := db.Collection(dbColName)
+	if err != nil {
+		log.Println("collection error: ", err)
+		return false, fmt.Errorf("failed to open collection: %w", err)
+	}
+
+	records := dbCol.GetAll()
+	if len(records) == 0 {
+		return false, errors.New("RSS20 - no feeds configured")
+	}
+
+	var updatedFeed *RSSFeed
+	for _, r := range records {
+		feedName := gjson.Get(string(r), "name").Str
+		feedChannel := gjson.Get(string(r), "channelId").Str
+		if feedName == Name && feedChannel == ChannelId {
+			var feed RSSFeed
+			if err := json.Unmarshal(r, &feed); err != nil {
+				return false, fmt.Errorf("failed to parse feed record: %w", err)
+			}
+			feed.ActiveStatus = active
+			updatedFeed = &feed
+
+			jsonData, err := json.Marshal(feed)
+			if err != nil {
+				return false, fmt.Errorf("failed to marshal updated feed: %w", err)
+			}
+			key := Name + "_" + ChannelId
+			if err := dbCol.Create(key, jsonData); err != nil {
+				return false, fmt.Errorf("failed to persist updated feed: %w", err)
+			}
+			break
+		}
+	}
+
+	if updatedFeed == nil {
+		return false, errors.New("RSS31 - feed not found")
+	}
+
+	memFeed := setFeedActiveStatusInMemory(Name, ChannelId, active)
+	if memFeed == nil {
+		updateRSSFeeds(updatedFeed)
+		memFeed = updatedFeed
+	}
+
+	if !active {
+		stopFeedWorker(Name, ChannelId)
+	} else {
+		sessionToUse := s
+		if sessionToUse == nil {
+			sessionToUse = activeSession
+		}
+		if sessionToUse != nil {
+			startFeedWorker(sessionToUse, memFeed)
+		}
+	}
+
+	return true, nil
+}
+
+// PauseFeed pauses parsing of a feed and stops its background worker.
+func PauseFeed(s *discordgo.Session, Name string, ChannelId string, cfg *config.Discord) (bool, error) {
+	return SetFeedActiveStatus(s, Name, ChannelId, false, cfg)
+}
+
+// ResumeFeed resumes parsing of a feed and starts its background worker.
+func ResumeFeed(s *discordgo.Session, Name string, ChannelId string, cfg *config.Discord) (bool, error) {
+	return SetFeedActiveStatus(s, Name, ChannelId, true, cfg)
+}
+
+// GetFeeds returns all configured RSS feeds from the database.
+func GetFeeds(cfg *config.Discord) ([]RSSFeed, error) {
+	var dbName = cfg.DBName
+	var dbColName = cfg.DBColName
+
+	db, err := simplejsondb.New(dbName, nil)
+	if err != nil {
+		log.Println("db error: ", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	dbCol, err := db.Collection(dbColName)
+	if err != nil {
+		log.Println("collection error: ", err)
+		return nil, fmt.Errorf("failed to open collection: %w", err)
+	}
+
+	records := dbCol.GetAll()
+	feeds := make([]RSSFeed, 0, len(records))
+	for _, r := range records {
+		var feed RSSFeed
+		if err := json.Unmarshal(r, &feed); err != nil {
+			continue
+		}
+		feeds = append(feeds, feed)
+	}
+	return feeds, nil
 }
