@@ -154,3 +154,60 @@ func TestReplyCommands_PauseAndResume_Authorized(t *testing.T) {
 		t.Fatalf("expected enable success message, got: %v", *sentMessages)
 	}
 }
+
+func TestReplyCommands_List_Empty(t *testing.T) {
+	const guildID, channelID, userID = "guild-1", "123456789012345678", "user-1"
+	t.Chdir(t.TempDir())
+
+	s, sentMessages := newMockSession(t, guildID, channelID, userID, true)
+	cfg := &config.Discord{Prefix: "!", DBName: "testdb", DBColName: "feeds"}
+	h := New(cfg)
+
+	msg := &discordgo.MessageCreate{
+		Message: &discordgo.Message{
+			ChannelID: channelID,
+			Content:   "!rss list",
+			Author:    &discordgo.User{ID: userID},
+		},
+	}
+	h.ReplyCommands(s, msg)
+
+	if len(*sentMessages) != 1 || !strings.Contains((*sentMessages)[0], "no RSS feeds configured") {
+		t.Fatalf("expected 'no RSS feeds configured' message, got: %v", *sentMessages)
+	}
+}
+
+func TestReplyCommands_List_WithFeeds(t *testing.T) {
+	const guildID, channelID, userID = "guild-1", "123456789012345678", "user-1"
+	t.Chdir(t.TempDir())
+
+	s, sentMessages := newMockSession(t, guildID, channelID, userID, true)
+	cfg := &config.Discord{Prefix: "!", DBName: "testdb", DBColName: "feeds"}
+	h := New(cfg)
+
+	if _, err := rss.AddUrlToList("news", "https://example.com/rss", channelID, cfg); err != nil {
+		t.Fatalf("failed to seed feed: %v", err)
+	}
+
+	msg := &discordgo.MessageCreate{
+		Message: &discordgo.Message{
+			ChannelID: channelID,
+			Content:   "!rss list",
+			Author:    &discordgo.User{ID: userID},
+		},
+	}
+	h.ReplyCommands(s, msg)
+
+	if len(*sentMessages) != 1 {
+		t.Fatalf("expected 1 message, got: %v", *sentMessages)
+	}
+	out := (*sentMessages)[0]
+	if !strings.Contains(out, "Configured RSS Feeds (1):") ||
+		!strings.Contains(out, "news") ||
+		!strings.Contains(out, "https://example.com/rss") ||
+		!strings.Contains(out, "#news-channel") ||
+		!strings.Contains(out, channelID) ||
+		!strings.Contains(out, "active") {
+		t.Fatalf("unexpected list output: %s", out)
+	}
+}

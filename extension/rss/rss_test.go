@@ -462,3 +462,38 @@ func TestWorkerLifecycle_StartStopAndRemove(t *testing.T) {
 		t.Fatal("expected worker to be stopped after RemoveFeedFromList")
 	}
 }
+
+func TestGetFeeds_Empty(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	feeds, err := GetFeeds(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(feeds) != 0 {
+		t.Fatalf("expected 0 feeds, got %d", len(feeds))
+	}
+}
+
+func TestGetFeeds_WithFeeds(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	if _, err := AddUrlToList("news", "https://example.com/rss", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on add: %v", err)
+	}
+	if _, err := AddUrlToList("alerts", "https://example.com/alerts", otherChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on add: %v", err)
+	}
+
+	feeds, err := GetFeeds(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(feeds) != 2 {
+		t.Fatalf("expected 2 feeds, got %d", len(feeds))
+	}
+}

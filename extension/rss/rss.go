@@ -572,3 +572,32 @@ func PauseFeed(s *discordgo.Session, Name string, ChannelId string, cfg *config.
 func ResumeFeed(s *discordgo.Session, Name string, ChannelId string, cfg *config.Discord) (bool, error) {
 	return SetFeedActiveStatus(s, Name, ChannelId, true, cfg)
 }
+
+// GetFeeds returns all configured RSS feeds from the database.
+func GetFeeds(cfg *config.Discord) ([]RSSFeed, error) {
+	var dbName = cfg.DBName
+	var dbColName = cfg.DBColName
+
+	db, err := simplejsondb.New(dbName, nil)
+	if err != nil {
+		log.Println("db error: ", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	dbCol, err := db.Collection(dbColName)
+	if err != nil {
+		log.Println("collection error: ", err)
+		return nil, fmt.Errorf("failed to open collection: %w", err)
+	}
+
+	records := dbCol.GetAll()
+	feeds := make([]RSSFeed, 0, len(records))
+	for _, r := range records {
+		var feed RSSFeed
+		if err := json.Unmarshal(r, &feed); err != nil {
+			continue
+		}
+		feeds = append(feeds, feed)
+	}
+	return feeds, nil
+}
