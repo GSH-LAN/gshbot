@@ -2,11 +2,20 @@ package messagehandler
 
 import (
 	"gshlan/gshbot/extension/rss"
-	"regexp"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+func parseChannelID(raw, defaultID string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "<#")
+	raw = strings.TrimSuffix(raw, ">")
+	if raw == "" {
+		return defaultID
+	}
+	return raw
+}
 
 func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreate) {
 	// Ignore all messages created by the bot itself
@@ -21,17 +30,18 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 			return
 		}
 
-		var badChannelId string
+		parts := strings.Split(msg.Content, " ")
+		subCmd := parts[1]
+
 		var channelId string
-		if strings.Split(msg.Content, " ")[1] == "add" {
-			name := strings.Split(msg.Content, " ")[2]
-			url := strings.Split(msg.Content, " ")[3]
+		switch subCmd {
+		case "add":
+			name := parts[2]
+			url := parts[3]
 			if strings.Contains(url, "http://") || strings.Contains(url, "https://") {
 				s.ChannelMessageSend(msg.ChannelID, "try to add the following feed name: "+name+" url: "+url)
-				if len(strings.Split(msg.Content, " ")) == 5 {
-					badChannelId = strings.Split(msg.Content, " ")[4]
-					r, _ := regexp.Compile("\\d{18}")
-					channelId = r.FindString(badChannelId)
+				if len(parts) >= 5 {
+					channelId = parseChannelID(parts[4], msg.ChannelID)
 				} else {
 					channelId = msg.ChannelID
 				}
@@ -44,10 +54,10 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 			} else {
 				s.ChannelMessageSend(msg.ChannelID, "please use a proper URL!")
 			}
-		} else if strings.Split(msg.Content, " ")[1] == "del" {
-			name := strings.Split(msg.Content, " ")[2]
-			if len(strings.Split(msg.Content, " ")) == 4 {
-				channelId = strings.Split(msg.Content, " ")[3]
+		case "del":
+			name := parts[2]
+			if len(parts) >= 4 {
+				channelId = parseChannelID(parts[3], msg.ChannelID)
 			} else {
 				channelId = msg.ChannelID
 			}
@@ -56,6 +66,32 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 				s.ChannelMessageSend(msg.ChannelID, "feed removed successfully")
 			} else {
 				s.ChannelMessageSend(msg.ChannelID, "an error occurred: "+removeErr.Error())
+			}
+		case "pause", "disable":
+			name := parts[2]
+			if len(parts) >= 4 {
+				channelId = parseChannelID(parts[3], msg.ChannelID)
+			} else {
+				channelId = msg.ChannelID
+			}
+			paused, pauseErr := rss.PauseFeed(s, name, channelId, h.config)
+			if paused && pauseErr == nil {
+				s.ChannelMessageSend(msg.ChannelID, "feed paused successfully")
+			} else {
+				s.ChannelMessageSend(msg.ChannelID, "an error occurred: "+pauseErr.Error())
+			}
+		case "resume", "enable":
+			name := parts[2]
+			if len(parts) >= 4 {
+				channelId = parseChannelID(parts[3], msg.ChannelID)
+			} else {
+				channelId = msg.ChannelID
+			}
+			resumed, resumeErr := rss.ResumeFeed(s, name, channelId, h.config)
+			if resumed && resumeErr == nil {
+				s.ChannelMessageSend(msg.ChannelID, "feed resumed successfully")
+			} else {
+				s.ChannelMessageSend(msg.ChannelID, "an error occurred: "+resumeErr.Error())
 			}
 		}
 

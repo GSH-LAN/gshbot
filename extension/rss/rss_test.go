@@ -7,6 +7,7 @@ import (
 
 	"gshlan/gshbot/config"
 
+	"github.com/bwmarrin/discordgo"
 	simplejsondb "github.com/pnkj-kmr/simple-json-db"
 )
 
@@ -29,6 +30,8 @@ func resetGlobalState() {
 	// Mirrors the initialization ConfigureRSSFeeds performs in production,
 	// since updateMessageQueue panics on a nil map.
 	messageQueue = MessageQueue{MessageQueue: make(map[string][]string)}
+	StopRSSFeeds()
+	activeSession = nil
 }
 
 func TestAddUrlToList_NewEntry(t *testing.T) {
@@ -281,5 +284,181 @@ func TestLoadFeeds(t *testing.T) {
 	}
 	if feed.Timer != 300 || !feed.ActiveStatus {
 		t.Fatalf("unexpected default feed settings: %+v", feed)
+	}
+}
+
+func TestPauseFeed_Success(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	if _, err := AddUrlToList("news", "https://example.com/rss", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on add: %v", err)
+	}
+	LoadFeeds(cfg)
+
+	ok, err := PauseFeed(nil, "news", testChannelId, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error on pause: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected pause to return true")
+	}
+
+	// Verify database record
+	db, _ := simplejsondb.New(cfg.DBName, nil)
+	col, _ := db.Collection(cfg.DBColName)
+	records := col.GetAll()
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	var persisted RSSFeed
+	if err := json.Unmarshal(records[0], &persisted); err != nil {
+		t.Fatalf("failed to unmarshal persisted feed: %v", err)
+	}
+	if persisted.ActiveStatus {
+		t.Fatal("expected persisted ActiveStatus to be false")
+	}
+
+	// Verify in-memory state
+	if len(rssFeeds.RSSFeeds) != 1 || rssFeeds.RSSFeeds[0].ActiveStatus {
+		t.Fatalf("expected in-memory feed ActiveStatus to be false, got: %+v", rssFeeds.RSSFeeds)
+	}
+}
+
+func TestResumeFeed_Success(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	if _, err := AddUrlToList("news", "https://example.com/rss", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on add: %v", err)
+	}
+	LoadFeeds(cfg)
+
+	if _, err := PauseFeed(nil, "news", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on pause: %v", err)
+	}
+
+	ok, err := ResumeFeed(nil, "news", testChannelId, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error on resume: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected resume to return true")
+	}
+
+	// Verify database record
+	db, _ := simplejsondb.New(cfg.DBName, nil)
+	col, _ := db.Collection(cfg.DBColName)
+	var persisted RSSFeed
+	if err := json.Unmarshal(col.GetAll()[0], &persisted); err != nil {
+		t.Fatalf("failed to unmarshal persisted feed: %v", err)
+	}
+	if !persisted.ActiveStatus {
+		t.Fatal("expected persisted ActiveStatus to be true")
+	}
+
+	// Verify in-memory state
+	if len(rssFeeds.RSSFeeds) != 1 || !rssFeeds.RSSFeeds[0].ActiveStatus {
+		t.Fatalf("expected in-memory feed ActiveStatus to be true, got: %+v", rssFeeds.RSSFeeds)
+	}
+}
+
+func TestPauseFeed_NoFeedsConfigured(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	ok, err := PauseFeed(nil, "news", testChannelId, cfg)
+	if err == nil {
+		t.Fatal("expected error when no feeds configured")
+	}
+	if ok {
+		t.Fatal("expected ok to be false")
+	}
+	if !strings.Contains(err.Error(), "no feeds configured") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestPauseFeed_FeedNotFound(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	if _, err := AddUrlToList("news", "https://example.com/rss", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on add: %v", err)
+	}
+
+	ok, err := PauseFeed(nil, "other", otherChannelId, cfg)
+	if err == nil {
+		t.Fatal("expected error when feed not found")
+	}
+	if ok {
+		t.Fatal("expected ok to be false")
+	}
+	if !strings.Contains(err.Error(), "feed not found") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestPauseFeed_RejectsInvalidIdentifiers(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	if _, err := PauseFeed(nil, "../../invalid", testChannelId, cfg); err == nil {
+		t.Fatal("expected error on invalid feed name")
+	}
+
+	if _, err := PauseFeed(nil, "news", "not-a-snowflake", cfg); err == nil {
+		t.Fatal("expected error on invalid channel id")
+	}
+}
+
+func TestWorkerLifecycle_StartStopAndRemove(t *testing.T) {
+	cfg := newTestConfig(t)
+	resetGlobalState()
+	t.Cleanup(resetGlobalState)
+
+	s, err := discordgo.New("Bot faketoken")
+	if err != nil {
+		t.Fatalf("failed to create session: %v", err)
+	}
+
+	feed := RSSFeed{
+		Name:         "news",
+		Url:          "https://example.com/rss",
+		ChannelId:    testChannelId,
+		Timer:        300,
+		ActiveStatus: true,
+	}
+
+	// 1. Worker start & stop
+	startFeedWorker(s, &feed)
+	if !IsWorkerRunning(feed.Name, feed.ChannelId) {
+		t.Fatal("expected worker to be running after startFeedWorker")
+	}
+
+	stopFeedWorker(feed.Name, feed.ChannelId)
+	if IsWorkerRunning(feed.Name, feed.ChannelId) {
+		t.Fatal("expected worker to be stopped after stopFeedWorker")
+	}
+
+	// 2. RemoveFeedFromList stops active worker
+	if _, err := AddUrlToList("news", "https://example.com/rss", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on add: %v", err)
+	}
+	startFeedWorker(s, &feed)
+	if !IsWorkerRunning(feed.Name, feed.ChannelId) {
+		t.Fatal("expected worker to be running before removal")
+	}
+
+	if _, err := RemoveFeedFromList("news", testChannelId, cfg); err != nil {
+		t.Fatalf("unexpected error on remove: %v", err)
+	}
+	if IsWorkerRunning(feed.Name, feed.ChannelId) {
+		t.Fatal("expected worker to be stopped after RemoveFeedFromList")
 	}
 }
