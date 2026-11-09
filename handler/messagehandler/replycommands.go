@@ -47,16 +47,12 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 		return
 	}
 
-	subCmd := parts[1]
-	if subCmd != "list" && len(parts) < 3 {
-		return
-	}
-
 	if !hasManageGuildPermission(s, msg) {
 		s.ChannelMessageSend(msg.ChannelID, "you need the 'Manage Server' permission to manage RSS feeds")
 		return
 	}
 
+	subCmd := parts[1]
 	var channelId string
 	switch subCmd {
 	case "list":
@@ -105,6 +101,9 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 			s.ChannelMessageSend(msg.ChannelID, "please use a proper URL!")
 		}
 	case "del":
+		if len(parts) < 3 {
+			return
+		}
 		name := parts[2]
 		if len(parts) >= 4 {
 			channelId = parseChannelID(parts[3], msg.ChannelID)
@@ -118,6 +117,9 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 			s.ChannelMessageSend(msg.ChannelID, "an error occurred: "+removeErr.Error())
 		}
 	case "pause", "disable":
+		if len(parts) < 3 {
+			return
+		}
 		name := parts[2]
 		if len(parts) >= 4 {
 			channelId = parseChannelID(parts[3], msg.ChannelID)
@@ -131,6 +133,9 @@ func (h Handler) ReplyCommands(s *discordgo.Session, msg *discordgo.MessageCreat
 			s.ChannelMessageSend(msg.ChannelID, "an error occurred: "+pauseErr.Error())
 		}
 	case "resume", "enable":
+		if len(parts) < 3 {
+			return
+		}
 		name := parts[2]
 		if len(parts) >= 4 {
 			channelId = parseChannelID(parts[3], msg.ChannelID)
